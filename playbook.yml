@@ -1,0 +1,83 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: create user
+      ansible.builtin.user:
+        name: ansible-worker
+        state: present
+
+    - name: git install
+      ansible.builtin.apt:
+        name: git
+        state: present
+        update_cache: yes
+      tags: install-git
+
+    - name: copy SSH keys
+      ansible.builtin.copy:
+        src: ./ssh_keys/
+        dest: /home/ansible-worker/.ssh/
+        owner: ansible-worker
+        group: ansible-worker
+        mode: 0600
+      tags: ssh-copy
+
+    - name: ensure github.com is a known host
+      lineinfile:
+        dest: /home/ansible-worker/.ssh/known_hosts
+        create: yes
+        state: present
+        line: "{{ lookup('pipe', 'ssh-keyscan -t rsa github.com') }}"
+        regexp: "^github\\.com"
+
+    - name: set read permissions for ansible-worker directory
+      ansible.builtin.file:
+        path: /home/ansible-worker
+        owner: ansible-worker
+        group: ansible-worker
+        mode: "0755"
+        recurse: yes
+
+    - name: clone repository
+      ansible.builtin.git:
+        repo: "https://github.com/iphilka/stud-template.git"
+        dest: "/home/ansible-worker/www/ansible.iphilka.ru"
+        update: no
+      tags: clone-repo
+
+    - name: replace html
+      ansible.builtin.copy:
+        src: ./index.html
+        dest: /home/ansible-worker/www/stud-template/index.html
+        owner: ansible-worker
+        mode: 0644
+
+    - name: install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: latest
+      tags: nginx
+
+    - name: copy config
+      ansible.builtin.copy:
+        src: ./ansible.iphilka.ru.conf
+        dest: /etc/nginx/sites-available
+        owner: ansible-worker
+      tags: nginx
+      notify: 
+        - restart Nginx
+
+    - name: create link for nginx config
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/ansible.iphilka.ru.conf
+        dest: /etc/nginx/sites-enabled/ansible.iphilka.ru.conf
+        state: link
+      tags: nginx
+      notify: 
+        - restart Nginx
+
+  handlers:
+    - name: restart Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
