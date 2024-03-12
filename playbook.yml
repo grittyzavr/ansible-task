@@ -11,7 +11,6 @@
         name: git
         state: present
         update_cache: yes
-      tags: install-git
 
     - name: copy SSH keys
       ansible.builtin.copy:
@@ -20,7 +19,6 @@
         owner: ansible-worker
         group: ansible-worker
         mode: 0600
-      tags: ssh-copy
 
     - name: ensure github.com is a known host
       lineinfile:
@@ -43,7 +41,6 @@
         repo: "https://github.com/iphilka/stud-template.git"
         dest: "/home/ansible-worker/www/ansible.iphilka.ru"
         update: no
-      tags: clone-repo
 
     - name: replace html
       ansible.builtin.copy:
@@ -56,28 +53,25 @@
       ansible.builtin.apt:
         name: nginx
         state: latest
-      tags: nginx
 
     - name: copy config
       ansible.builtin.copy:
         src: ./ansible.iphilka.ru.conf
         dest: /etc/nginx/sites-available
         owner: ansible-worker
-      tags: nginx
       notify: 
-        - restart Nginx
+        - restart_nginx
 
     - name: create link for nginx config
       ansible.builtin.file:
         src: /etc/nginx/sites-available/ansible.iphilka.ru.conf
         dest: /etc/nginx/sites-enabled/ansible.iphilka.ru.conf
         state: link
-      tags: nginx
       notify: 
-        - restart Nginx
+        - restart_nginx
 
   handlers:
-    - name: restart Nginx
+    - name: restart_nginx
       ansible.builtin.service:
         name: nginx
         state: reloaded
